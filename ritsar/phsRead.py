@@ -73,10 +73,10 @@ def AFRL(directory, pol, start_az, n_az=3):
                     
         #Vector to scene center at synthetic aperture center
         if np.mod(npulses,2)>0:
-            R_c = pos[npulses/2]
+            R_c = pos[npulses//2]
         else:
             R_c = np.mean(
-                    pos[npulses/2-1:npulses/2+1],
+                    pos[npulses//2-1:npulses//2+1],
                     axis = 0)
         
         #Save values to dictionary for export
@@ -108,7 +108,7 @@ def AFRL(directory, pol, start_az, n_az=3):
         R_c = pos[npulses/2]
     else:
         R_c = np.mean(
-                pos[npulses/2-1:npulses/2+1],
+                pos[npulses//2-1:npulses//2+1],
                 axis = 0)
                        
     #Replace Dictionary values
@@ -255,7 +255,7 @@ def Sandia(directory):
     k_r = 2*omega/c
     
     if np.mod(npulses,2)>0:
-        R_c = pos[npulses/2]
+        R_c = pos[int(npulses/2)]
     else:
         R_c = np.mean(
                 pos[npulses/2-1:npulses/2+1],

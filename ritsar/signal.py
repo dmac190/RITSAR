@@ -9,7 +9,7 @@
 import numpy as np
 from numpy import pi, arccosh, sqrt, cos
 from scipy.fftpack import fftshift, fft2, ifft2, fft, ifft
-from scipy.signal import firwin, filtfilt
+from scipy.signal import firwin, filtfilt, resample
 
 #all FT's assumed to be centered at the origin
 def ft(f, ax=-1):
@@ -185,3 +185,62 @@ def decimate(x, q, n=None, axis=-1, beta = None, cutoff = 'nyq'):
     sl = [slice(None)] * y.ndim
     sl[axis] = slice(None, None, q)
     return y[sl]
+
+def polyphase_interp (x, xp, yp, n_taps=15, n_phases=10000, cutoff = 0.95):
+        
+    # Compute input and output sample spacing
+    dxp = np.diff(xp).min()
+    dx = np.diff(x).min()
+    
+    # Assume uniformly spaced input
+    #if dx > (1.001*np.diff(x)).max() or dx < (0.999*np.diff(x)).min():
+    #        raise ValueError('Output sample spacing not uniform')
+    
+    # Input centered convolution - scale output sample spacing to 1
+    offset = x.min()
+    G = ((x-offset)/dx).astype(int)
+    Gp = ((xp-offset)/dx)
+    
+    # Create prototype polyphase filter
+    if not n_taps%2:
+        raise ValueError('Filter should have odd number of taps')
+    
+    if dx > dxp:                    # Downsampling
+        f_cutoff = cutoff           # Align filter nulls with output which has a sample spacing of 1 by definition
+    else:                           # Upsampling
+        f_cutoff = cutoff * dx/dxp  # Align filter nulls with input which has a normalized sample spacing of dxp/dx
+    
+    filt_proto = firwin(n_taps, f_cutoff, fs=2)
+    #filter_length = n_taps + 1
+    #locs = np.linspace(-filter_length/2, filter_length/2, n_taps)
+    #filt_proto = np.sinc(locs/ds_factor) #Use sinc for prototype filter
+    
+    # Create polyphase filter
+    filt_poly = resample(filt_proto, n_taps*n_phases)
+    
+    # Pad input for convolution
+    pad_left = max(G[0] - int(np.floor(Gp[0] - (n_taps-1)/2)), 0)
+    pad_right = max(int(np.ceil(Gp[-1] + (n_taps-1)/2)) - G[-1], 0)
+    
+    # Calculate output
+    y_pad = np.zeros(x.size + pad_left + pad_right)
+    
+    for i in range(xp.size):
+        V_current = yp[i]
+        G_current = Gp[i] + pad_left
+        G_left = G_current - (n_taps-1)/2
+        G_start = int(np.ceil(G_left))
+        G_right = G_current + (n_taps-1)/2
+        G_end = int(np.floor(G_right))
+        
+        # Input samples may not be evenly spaced so comput a local scale factor
+        if i < xp.size - 1:
+            local_scale = Gp[i+1] - Gp[i]
+        
+        filt = filt_poly[int((G_start-G_left)*n_phases):int((G_end-G_left)*n_phases)+1:n_phases]*local_scale
+        y_pad[G_start:G_end+1] += V_current*filt
+      
+    if pad_right > 0:
+        return y_pad[pad_left:-pad_right]
+    else:
+        return y_pad[pad_left:]
